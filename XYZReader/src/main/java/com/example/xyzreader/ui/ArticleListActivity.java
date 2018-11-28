@@ -7,20 +7,18 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
-import android.drm.DrmStore;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBar;
-import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.graphics.Palette;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
 import android.text.Html;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -68,8 +66,6 @@ public class ArticleListActivity extends AppCompatActivity implements
             actionBar.setLogo(R.drawable.logo);
             actionBar.setDisplayShowTitleEnabled(false);
         }
-
-        final View toolbarContainerView = findViewById(R.id.toolbar_container);
 
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
@@ -197,6 +193,14 @@ public class ArticleListActivity extends AppCompatActivity implements
                     mCursor.getString(ArticleLoader.Query.THUMB_URL),
                     ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
             holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
+
+            Bitmap bitmap = ImageLoaderHelper.getInstance(ArticleListActivity.this).getmListBitmap();
+            int colour = 0xFF333333;
+            if (bitmap!=null) {
+                Palette palette = Palette.from(bitmap).generate();
+                colour = palette.getDarkMutedColor(0xFF333333);
+            }
+            holder.itemView.setBackgroundColor (colour);
         }
 
         @Override
