@@ -2,23 +2,27 @@ package com.example.xyzreader.ui;
 
 import android.app.Fragment;
 import android.app.LoaderManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Rect;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.regex.Pattern;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.support.design.widget.AppBarLayout;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.graphics.Palette;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.text.Html;
 import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
@@ -50,8 +54,6 @@ public class ArticleDetailFragment extends Fragment implements
     private long mItemId;
     private View mRootView;
     private int mMutedColor = 0xFF333333;
-    private ObservableScrollView mScrollView;
-    private DrawInsetsFrameLayout mDrawInsetsFrameLayout;
     private ColorDrawable mStatusBarColorDrawable;
 
     private int mTopInset;
@@ -60,6 +62,7 @@ public class ArticleDetailFragment extends Fragment implements
     private int mScrollY;
     private boolean mIsCard = false;
     private int mStatusBarFullOpacityBottom;
+    private RecyclerView mRecyclerView;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
@@ -114,26 +117,9 @@ public class ArticleDetailFragment extends Fragment implements
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
-        mDrawInsetsFrameLayout = (DrawInsetsFrameLayout)
-                mRootView.findViewById(R.id.draw_insets_frame_layout);
-        mDrawInsetsFrameLayout.setOnInsetsCallback(new DrawInsetsFrameLayout.OnInsetsCallback() {
-            @Override
-            public void onInsetsChanged(Rect insets) {
-                mTopInset = insets.top;
-            }
-        });
 
-        mScrollView = (ObservableScrollView) mRootView.findViewById(R.id.scrollview);
-        mScrollView.setCallbacks(new ObservableScrollView.Callbacks() {
-            @Override
-            public void onScrollChanged() {
-                mScrollY = mScrollView.getScrollY();
-                getActivityCast().onUpButtonFloorChanged(mItemId, ArticleDetailFragment.this);
-                mPhotoContainerView.setTranslationY((int) (mScrollY - mScrollY / PARALLAX_FACTOR));
-                updateStatusBar();
-            }
-        });
+        mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
+        mRecyclerView = (RecyclerView) mRootView.findViewById(R.id.body_paragraph_recycler);
 
         mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
         mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
@@ -167,7 +153,6 @@ public class ArticleDetailFragment extends Fragment implements
                     (int) (Color.blue(mMutedColor) * 0.9));
         }
         mStatusBarColorDrawable.setColor(color);
-        mDrawInsetsFrameLayout.setInsetBackground(mStatusBarColorDrawable);
     }
 
     static float progress(float v, float min, float max) {
@@ -203,10 +188,6 @@ public class ArticleDetailFragment extends Fragment implements
         TextView titleView = (TextView) mRootView.findViewById(R.id.article_title);
         TextView bylineView = (TextView) mRootView.findViewById(R.id.article_byline);
         bylineView.setMovementMethod(new LinkMovementMethod());
-        TextView bodyView = (TextView) mRootView.findViewById(R.id.article_body);
-
-
-        bodyView.setTypeface(Typeface.createFromAsset(getResources().getAssets(), "Rosario-Regular.ttf"));
 
         if (mCursor != null) {
             mRootView.setAlpha(0);
@@ -232,12 +213,27 @@ public class ArticleDetailFragment extends Fragment implements
                                 + "</font>"));
 
             }
-            bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
+
+            String pattern = "(?<=(rn|r|n))([ \\t]*$)+";
+            String mWholeText = mCursor.getString(ArticleLoader.Query.BODY);
+            final String[] splitString =  Pattern.compile(pattern, Pattern.MULTILINE).split(mWholeText);
+
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    RecyclerViewAdapter adapter = new RecyclerViewAdapter(getActivity(), splitString);
+                    RecyclerView.LayoutManager recylerViewLayoutManager = new LinearLayoutManager(getActivity());
+                    mRecyclerView.setAdapter(adapter);
+                    mRecyclerView.setLayoutManager(recylerViewLayoutManager);
+                }
+            },100);
+
             ImageLoaderHelper.getInstance(getActivity()).getImageLoader()
                     .get(mCursor.getString(ArticleLoader.Query.PHOTO_URL), new ImageLoader.ImageListener() {
                         @Override
                         public void onResponse(ImageLoader.ImageContainer imageContainer, boolean b) {
                             Bitmap bitmap = imageContainer.getBitmap();
+
                             if (bitmap != null) {
                                 Palette p = Palette.generate(bitmap, 12);
                                 mMutedColor = p.getDarkMutedColor(0xFF333333);
@@ -257,7 +253,6 @@ public class ArticleDetailFragment extends Fragment implements
             mRootView.setVisibility(View.GONE);
             titleView.setText("N/A");
             bylineView.setText("N/A" );
-            bodyView.setText("N/A");
         }
     }
 
@@ -300,5 +295,53 @@ public class ArticleDetailFragment extends Fragment implements
         return mIsCard
                 ? (int) mPhotoContainerView.getTranslationY() + mPhotoView.getHeight() - mScrollY
                 : mPhotoView.getHeight() - mScrollY;
+    }
+
+    public class RecyclerViewAdapter extends RecyclerView.Adapter<ViewHolder>{
+
+        String[] mBodyParagraphs;
+        Context context;
+        View view1;
+        ViewHolder viewHolder1;
+
+        private RecyclerViewAdapter(Context context1, String[] mBodyParagpraphs){
+
+            mBodyParagraphs = mBodyParagpraphs;
+            context = context1;
+        }
+
+        @Override
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType){
+
+            view1 = LayoutInflater.from(context).inflate(R.layout.detail_body_paragraph_item,parent,false);
+
+            viewHolder1 = new ViewHolder(view1);
+
+            return viewHolder1;
+        }
+
+        @Override
+        public void onBindViewHolder(ViewHolder holder, int position){
+
+            holder.textView.setText(mBodyParagraphs[position]);
+        }
+
+        @Override
+        public int getItemCount(){
+
+            return mBodyParagraphs.length;
+        }
+    }
+
+    public static class ViewHolder extends RecyclerView.ViewHolder{
+
+        public TextView textView;
+
+        public ViewHolder(View v){
+
+            super(v);
+
+            textView = (TextView)v.findViewById(R.id.body_paragraph);
+        }
     }
 }
