@@ -98,11 +98,11 @@
         android:layout_marginTop="@dimen/fab_margin_top"
         android:background="@drawable/add_fab_background"
         android:contentDescription="@string/action_share"
-        android:elevation="@dimen/fab_elevation"
         android:src="@drawable/ic_share"
         android:stateListAnimator="@animator/fab_state_list_anim"
         app:layout_anchor="@id/app_bar"
-        app:layout_anchorGravity="end" />
+        app:layout_anchorGravity="end"
+        app:elevation="@dimen/fab_elevation"/>
 
 
 </android.support.design.widget.CoordinatorLayout>
